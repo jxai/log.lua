@@ -226,9 +226,39 @@ do
   -- Bad path should raise an error (fail loudly on misconfigured outfile)
   reset_log()
   log.outfile = "/nonexistent_dir/nope.log"
-  local ok = pcall(function() log.info("safe") end)
+  local ok, err = pcall(function() log.info("safe") end)
   log.outfile = nil
   assert_false("bad outfile path raises an error", ok)
+  assert_true("bad outfile error message contains OS reason", err and err:find("No such") ~= nil)
+end
+
+
+-- ── Suite: invalid level ─────────────────────────────────────────────────────
+
+real_print("\n── invalid level ──")
+
+do
+  -- setting an invalid level on the global logger raises immediately
+  reset_log()
+  local ok, err = pcall(function() log.level = "verbose" end)
+  reset_log()
+  assert_false("invalid level on global logger raises an error", ok)
+  assert_true("error message names the invalid value", err and err:find("verbose") ~= nil)
+end
+
+do
+  -- same check for an instance
+  local inst = log { level = "trace" }
+  local ok, err = pcall(function() inst.level = "verbose" end)
+  assert_false("invalid level on instance raises an error", ok)
+  assert_true("instance error message names the invalid value", err and err:find("verbose") ~= nil)
+end
+
+do
+  -- creating an instance with an invalid level raises immediately
+  local ok, err = pcall(function() log { level = "verbose" } end)
+  assert_false("log{level='invalid'} raises an error", ok)
+  assert_true("creation error message names the invalid value", err and err:find("verbose") ~= nil)
 end
 
 

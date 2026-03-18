@@ -88,10 +88,10 @@ local function attach_log_methods(instance, extra_mt)
 
       -- Output to log file
       if instance.outfile then
-        local fp = io.open(instance.outfile, "a")
+        local fp, err = io.open(instance.outfile, "a")
+        if not fp then error("could not open log file: " .. err) end
         local str = string.format("[%-6s%s] %s%s: %s\n",
           nameupper, os.date(), prefix, lineinfo, msg)
-        assert(fp)
         fp:write(str)
         fp:close()
       end
@@ -100,6 +100,9 @@ local function attach_log_methods(instance, extra_mt)
 
   local function apply_level(level)
     local threshold = levels[level]
+    if not threshold then
+      error("invalid log level: " .. tostring(level), 2)
+    end
     for i, x in ipairs(modes) do
       rawset(instance, x.name, i >= threshold and impls[i] or noop)
     end
@@ -131,9 +134,11 @@ end
 attach_log_methods(log, {
   __call = function(_, config)
     config = config or {}
+    local usecolor = config.usecolor
+    if usecolor == nil then usecolor = log.usecolor end
     local instance = {
-      usecolor = config.usecolor ~= nil and config.usecolor or log.usecolor,
-      outfile  = config.outfile ~= nil and config.outfile or log.outfile,
+      usecolor = usecolor,
+      outfile  = config.outfile or log.outfile,
       level    = config.level or log.level,
       name     = config.name,
     }
