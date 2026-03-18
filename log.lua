@@ -2,6 +2,7 @@
 -- log.lua
 --
 -- Copyright (c) 2016 rxi
+-- Copyright (c) 2026 jxai
 --
 -- This library is free software; you can redistribute it and/or modify it
 -- under the terms of the MIT license. See LICENSE for details.
@@ -52,39 +53,65 @@ local tostring = function(...)
 end
 
 
-for i, x in ipairs(modes) do
-  local nameupper = x.name:upper()
-  log[x.name] = function(...)
-    
-    -- Return early if we're below the log level
-    if i < levels[log.level] then
-      return
+local function attach_log_methods(instance)
+  for i, x in ipairs(modes) do
+    local nameupper = x.name:upper()
+    instance[x.name] = function(...)
+      -- Return early if we're below the log level
+      if i < levels[instance.level] then
+        return
+      end
+
+      local msg = tostring(...)
+      local info = debug.getinfo(2, "Sl")
+      local lineinfo = info.short_src .. ":" .. info.currentline
+      local prefix = instance.name and instance.name .. ":" or ""
+
+      -- Output to console
+      print(string.format("%s[%-6s%s]%s %s%s: %s",
+        instance.usecolor and x.color or "",
+        nameupper,
+        os.date("%H:%M:%S"),
+        instance.usecolor and "\27[0m" or "",
+        prefix,
+        lineinfo,
+        msg))
+
+      -- Output to log file
+      if instance.outfile then
+        local fp = io.open(instance.outfile, "a")
+        local str = string.format("[%-6s%s] %s%s: %s\n",
+          nameupper, os.date(), prefix, lineinfo, msg)
+        assert(fp)
+        fp:write(str)
+        fp:close()
+      end
     end
-
-    local msg = tostring(...)
-    local info = debug.getinfo(2, "Sl")
-    local lineinfo = info.short_src .. ":" .. info.currentline
-
-    -- Output to console
-    print(string.format("%s[%-6s%s]%s %s: %s",
-                        log.usecolor and x.color or "",
-                        nameupper,
-                        os.date("%H:%M:%S"),
-                        log.usecolor and "\27[0m" or "",
-                        lineinfo,
-                        msg))
-
-    -- Output to log file
-    if log.outfile then
-      local fp = io.open(log.outfile, "a")
-      local str = string.format("[%-6s%s] %s: %s\n",
-                                nameupper, os.date(), lineinfo, msg)
-      fp:write(str)
-      fp:close()
-    end
-
   end
 end
+
+
+-- Attach methods to the global logger, closing over `log` so that mutations
+-- like `log.level = "warn"` take effect immediately without recreation.
+attach_log_methods(log)
+
+
+-- Make log callable to create named/customized logger instances.
+-- Usage: local logger = log{ name="my logger", level="debug" }
+-- Unspecified options inherit from the global values at creation time.
+setmetatable(log, {
+  __call = function(_, config)
+    config = config or {}
+    local instance = {
+      usecolor = config.usecolor ~= nil and config.usecolor or log.usecolor,
+      outfile  = config.outfile ~= nil and config.outfile or log.outfile,
+      level    = config.level or log.level,
+      name     = config.name,
+    }
+    attach_log_methods(instance)
+    return instance
+  end
+})
 
 
 return log
