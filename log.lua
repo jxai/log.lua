@@ -53,15 +53,24 @@ local tostring = function(...)
 end
 
 
-local function attach_log_methods(instance)
+local noop = function() end
+
+-- attach_log_methods(instance, extra_mt):
+--   Builds one real implementation per log level and stores them in a closure.
+--   apply_level() rawsets each mode key to either the real impl or noop, so
+--   calls to disabled levels cost nothing beyond a table lookup.
+--   `level` is kept out of the raw table so that __newindex always intercepts
+--   assignments and triggers apply_level() automatically.
+--   extra_mt allows the caller to inject additional metamethods (e.g. __call
+--   on the singleton) into the same metatable.
+local function attach_log_methods(instance, extra_mt)
+  local current_level = instance.level
+
+  -- Build real implementations upfront, closed over `instance`.
+  local impls = {}
   for i, x in ipairs(modes) do
     local nameupper = x.name:upper()
-    instance[x.name] = function(...)
-      -- Return early if we're below the log level
-      if i < levels[instance.level] then
-        return
-      end
-
+    impls[i] = function(...)
       local msg = tostring(...)
       local info = debug.getinfo(2, "Sl")
       local lineinfo = info.short_src .. ":" .. info.currentline
@@ -88,18 +97,38 @@ local function attach_log_methods(instance)
       end
     end
   end
+
+  local function apply_level(level)
+    local threshold = levels[level]
+    for i, x in ipairs(modes) do
+      rawset(instance, x.name, i >= threshold and impls[i] or noop)
+    end
+  end
+
+  -- Remove `level` from the raw table so __newindex always fires for it.
+  rawset(instance, "level", nil)
+
+  local mt = extra_mt or {}
+  mt.__index = function(_, k)
+    if k == "level" then return current_level end
+  end
+  mt.__newindex = function(t, k, v)
+    if k == "level" then
+      current_level = v
+      apply_level(v)
+    else
+      rawset(t, k, v)
+    end
+  end
+  setmetatable(instance, mt)
+
+  apply_level(current_level)
 end
 
 
--- Attach methods to the global logger, closing over `log` so that mutations
--- like `log.level = "warn"` take effect immediately without recreation.
-attach_log_methods(log)
-
-
--- Make log callable to create named/customized logger instances.
--- Usage: local logger = log{ name="my logger", level="debug" }
--- Unspecified options inherit from the global values at creation time.
-setmetatable(log, {
+-- Attach methods to the global logger. Pass the __call metamethod in the same
+-- table so the singleton ends up with a single combined metatable.
+attach_log_methods(log, {
   __call = function(_, config)
     config = config or {}
     local instance = {
