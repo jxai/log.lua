@@ -8,7 +8,7 @@
 -- under the terms of the MIT license. See LICENSE for details.
 --
 
-local log = { _version = "0.1.0" }
+local log = { _version = "0.2.0" }
 
 log.usecolor = true
 log.outfile = nil
