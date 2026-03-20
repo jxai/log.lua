@@ -411,6 +411,15 @@ do
   assert_true("name appears in outfile output", contents:find("mymod"))
 end
 
+do
+  -- name is read-only after creation
+  local inst = log { name = "mymod" }
+  local ok, err = pcall(function() inst.name = "other" end)
+  assert_false("assigning name after creation raises an error", ok)
+  assert_true("error message mentions name is read-only", err and err:find("read%-only"))
+  assert_eq("name unchanged after failed assignment", inst.name, "mymod")
+end
+
 
 -- ── Suite: noop optimization ─────────────────────────────────────────────────
 

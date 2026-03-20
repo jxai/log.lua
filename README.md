@@ -64,7 +64,7 @@ log messages on stderr.
 
 A custom function that takes a single value and returns its string
 representation, useful when you need richer or domain-specific output. `nil`
-by default, falling back to the plain `tostring`.
+by default, falling back to the built-in behavior (number rounding + `tostring`).
 
 An example using [inspect.lua](https://github.com/kikito/inspect.lua):
 
@@ -92,7 +92,7 @@ logger.warn("something went wrong")
 #### name
 
 A string label included in each log line to identify the logger. `nil` by
-default (no label), as with the global logger.
+default (no label), as with the global logger. Read-only after creation.
 
 #### level, usecolor, outfile, stderr, tostr
 

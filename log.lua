@@ -67,16 +67,17 @@ local noop = function() end
 --   on the singleton) into the same metatable.
 local function attach_log_methods(instance, extra_mt)
   local current_level = instance.level
+  local current_name  = instance.name
+  local impls         = {}
 
   -- Build real implementations upfront, closed over `instance`.
-  local impls = {}
   for i, x in ipairs(modes) do
     local nameupper = x.name:upper()
     impls[i] = function(...)
       local msg = make_msg(instance.tostr, ...)
       local info = debug.getinfo(2, "Sl")
       local lineinfo = info.short_src .. ":" .. info.currentline
-      local prefix = instance.name and instance.name .. ":" or ""
+      local prefix = current_name and current_name .. ":" or ""
 
       -- Output to console
       local out = instance.stderr and io.stderr or io.stdout
@@ -111,17 +112,21 @@ local function attach_log_methods(instance, extra_mt)
     end
   end
 
-  -- Remove `level` from the raw table so __newindex always fires for it.
+  -- Remove level and name from the raw table so __newindex always fires for them.
   rawset(instance, "level", nil)
+  rawset(instance, "name", nil)
 
   local mt = extra_mt or {}
   mt.__index = function(_, k)
     if k == "level" then return current_level end
+    if k == "name" then return current_name end
   end
   mt.__newindex = function(t, k, v)
     if k == "level" then
       current_level = v
       apply_level(v)
+    elseif k == "name" then
+      error("name is read-only after creation", 2)
     else
       rawset(t, k, v)
     end
