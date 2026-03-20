@@ -43,6 +43,7 @@ local function reset_log()
   log.level    = "trace"
   log.usecolor = true
   log.outfile  = nil
+  log.tostr    = nil
 end
 
 -- Strip ANSI escape codes so we can assert on plain text
@@ -451,6 +452,93 @@ do
   local noop_ref = inst.trace
   inst.level = "trace"
   assert_false("instance: trace is real impl after level lowered", inst.trace == noop_ref)
+end
+
+
+-- ── Suite: tostr ─────────────────────────────────────────────────────────────
+
+real_print("\n── tostr ──")
+
+do
+  -- nil by default: existing behavior unchanged
+  reset_log()
+  log.usecolor = false
+  assert_eq("tostr is nil by default on global logger", log.tostr, nil)
+
+  capture_start()
+  log.info("plain")
+  capture_stop()
+  assert_true("nil tostr still produces output", captured[1]:find("plain"))
+end
+
+do
+  -- custom tostr is called for each argument
+  reset_log()
+  log.usecolor = false
+  local calls = {}
+  log.tostr = function(v) calls[#calls + 1] = v; return "x" end
+
+  capture_start()
+  log.info("a", "b")
+  capture_stop()
+
+  assert_eq("custom tostr called once per arg", #calls, 2)
+  assert_true("custom tostr return value appears in output", captured[1]:find("x x"))
+end
+
+do
+  -- custom tostr bypasses number rounding
+  log.tostr = function(v) return tostring(v) end
+
+  capture_start()
+  log.info(1.23456)
+  capture_stop()
+
+  assert_true("custom tostr bypasses number rounding", strip_ansi(captured[1]):find("1.23456"))
+end
+
+do
+  -- custom tostr on an instance, does not affect global logger
+  reset_log()
+  log.usecolor = false
+  local inst = log { tostr = function(v) return "T:" .. tostring(v) end, usecolor = false }
+
+  capture_start()
+  inst.info("hello")
+  capture_stop()
+  assert_true("instance tostr wraps value", captured[1]:find("T:hello"))
+
+  capture_start()
+  log.info("hello")
+  capture_stop()
+  assert_false("global logger unaffected by instance tostr", captured[1]:find("T:hello"))
+end
+
+do
+  -- instance inherits tostr from global logger
+  reset_log()
+  log.tostr = function(v) return "G:" .. tostring(v) end
+  local inst = log { usecolor = false }
+  log.usecolor = false
+
+  capture_start()
+  inst.info("hello")
+  capture_stop()
+
+  assert_true("instance inherits tostr from global logger", captured[1]:find("G:hello"))
+end
+
+do
+  -- instance-level tostr overrides inherited global tostr
+  reset_log()
+  log.tostr = function(v) return "G:" .. tostring(v) end
+  local inst = log { tostr = function(v) return "I:" .. tostring(v) end, usecolor = false }
+
+  capture_start()
+  inst.info("hello")
+  capture_stop()
+  assert_true("instance tostr overrides global tostr", captured[1]:find("I:hello"))
+  assert_false("global tostr not used when instance tostr set", captured[1]:find("G:hello"))
 end
 
 

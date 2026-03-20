@@ -38,16 +38,16 @@ local round = function(x, increment)
 end
 
 
-local _tostring = tostring
-
-local tostring = function(...)
+local make_msg = function(tostr, ...)
   local t = {}
   for i = 1, select('#', ...) do
     local x = select(i, ...)
-    if type(x) == "number" then
-      x = round(x, .01)
+    if tostr then
+      t[#t + 1] = tostr(x)
+    else
+      if type(x) == "number" then x = round(x, .01) end
+      t[#t + 1] = tostring(x)
     end
-    t[#t + 1] = _tostring(x)
   end
   return table.concat(t, " ")
 end
@@ -71,7 +71,7 @@ local function attach_log_methods(instance, extra_mt)
   for i, x in ipairs(modes) do
     local nameupper = x.name:upper()
     impls[i] = function(...)
-      local msg = tostring(...)
+      local msg = make_msg(instance.tostr, ...)
       local info = debug.getinfo(2, "Sl")
       local lineinfo = info.short_src .. ":" .. info.currentline
       local prefix = instance.name and instance.name .. ":" or ""
@@ -141,6 +141,7 @@ attach_log_methods(log, {
       outfile  = config.outfile or log.outfile,
       level    = config.level or log.level,
       name     = config.name,
+      tostr    = config.tostr or log.tostr,
     }
     attach_log_methods(instance)
     return instance

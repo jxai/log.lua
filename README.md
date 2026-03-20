@@ -54,6 +54,30 @@ ignored.
 The level of each log mode, starting with the lowest log level is as follows:
 `"trace"` `"debug"` `"info"` `"warn"` `"error"` `"fatal"`
 
+#### log.tostr
+
+A custom function that takes a single value and returns its string
+representation, useful when you need richer or domain-specific output. `nil`
+by default, falling back to the plain `tostring`.
+
+```lua
+log.tostr = function(v)
+  if type(v) == "table" then
+    -- your own serialization
+  end
+  return tostring(v)
+end
+```
+
+An example using [inspect.lua](https://github.com/kikito/inspect.lua):
+
+```lua
+local inspect = require "inspect"
+log.tostr = function(v) return inspect(v, {newline=" ", indent="", depth=2}) end
+log.info({ key = "value" })
+-- [INFO  14:32:01] src.lua:2: { key = "value" }
+```
+
 ## Logger instances
 
 The global logger `log` is also callable and returns a new independent logger
@@ -77,10 +101,10 @@ logger.usecolor = false
 
 #### name
 
-A string label included in each log line to identify the logger, `nil` by
-default. The global logger doesn't have a name.
+A string label included in each log line to identify the logger. `nil` by
+default (no label), as with the global logger.
 
-#### level, usecolor, outfile
+#### level, usecolor, outfile, tostr
 
 Same semantics as the global options above. When not specified, the global
 values are used as defaults at instance creation time.
