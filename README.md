@@ -30,6 +30,16 @@ if one is set -- the log file:
 
 log.lua provides variables for setting additional options:
 
+#### log.level
+
+The minimum level to log, any logging function called with a lower level than
+the `log.level` is ignored and no text is outputted or written. By default this
+value is set to `"trace"`, the lowest log level, such that no log messages are
+ignored.
+
+The level of each log mode, starting with the lowest log level is as follows:
+`"trace"` `"debug"` `"info"` `"warn"` `"error"` `"fatal"`
+
 #### log.usecolor
 
 Whether colors should be used when outputting to the console, this is `true` by
@@ -44,30 +54,11 @@ ANSI colors and always use the full date rather than just the time. By default
 set as the `log.outfile` then it is created on the first message logged. If the
 file already exists it is appended to.
 
-#### log.level
-
-The minimum level to log, any logging function called with a lower level than
-the `log.level` is ignored and no text is outputted or written. By default this
-value is set to `"trace"`, the lowest log level, such that no log messages are
-ignored.
-
-The level of each log mode, starting with the lowest log level is as follows:
-`"trace"` `"debug"` `"info"` `"warn"` `"error"` `"fatal"`
-
 #### log.tostr
 
 A custom function that takes a single value and returns its string
 representation, useful when you need richer or domain-specific output. `nil`
 by default, falling back to the plain `tostring`.
-
-```lua
-log.tostr = function(v)
-  if type(v) == "table" then
-    -- your own serialization
-  end
-  return tostring(v)
-end
-```
 
 An example using [inspect.lua](https://github.com/kikito/inspect.lua):
 
@@ -85,16 +76,9 @@ instance with its own configuration. Unspecified options inherit from the
 global logger's current values at creation time.
 
 ```lua
-local logger = log{ name="my module", level="warn", outfile="app.log" }
+local logger = log{ name="MyModule", level="warn" }
 logger.warn("something went wrong")
--- [WARN  14:32:01] my module src.lua:2: something went wrong
-```
-
-All instance options are mutable after creation:
-
-```lua
-logger.level = "trace"
-logger.usecolor = false
+-- [WARN  14:32:01] MyModule:src.lua:2: something went wrong
 ```
 
 ### Instance options
@@ -106,8 +90,19 @@ default (no label), as with the global logger.
 
 #### level, usecolor, outfile, tostr
 
-Same semantics as the global options above. When not specified, the global
-values are used as defaults at instance creation time.
+Same semantics as the global options above. They are mutable after creation:
+
+```lua
+logger.level = "trace"
+logger.usecolor = false
+logger.outfile = "app.log"
+logger.tostr = function(v)
+  if type(v) == "table" then
+    -- your own serialization
+  end
+  return tostring(v)
+end
+```
 
 ## License
 
