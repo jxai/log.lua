@@ -10,9 +10,11 @@
 
 local log = { _version = "0.2.0" }
 
+log.level = "trace"
 log.usecolor = true
 log.outfile = nil
-log.level = "trace"
+log.stderr = false
+log.tostr = nil
 
 
 local modes = {
@@ -77,7 +79,8 @@ local function attach_log_methods(instance, extra_mt)
       local prefix = instance.name and instance.name .. ":" or ""
 
       -- Output to console
-      print(string.format("%s[%-6s%s]%s %s%s: %s",
+      local out = instance.stderr and io.stderr or io.stdout
+      out:write(string.format("%s[%-6s%s]%s %s%s: %s\n",
         instance.usecolor and x.color or "",
         nameupper,
         os.date("%H:%M:%S"),
@@ -137,10 +140,11 @@ attach_log_methods(log, {
     local usecolor = config.usecolor
     if usecolor == nil then usecolor = log.usecolor end
     local instance = {
+      name     = config.name,
+      level    = config.level or log.level,
       usecolor = usecolor,
       outfile  = config.outfile or log.outfile,
-      level    = config.level or log.level,
-      name     = config.name,
+      stderr   = config.stderr ~= nil and config.stderr or log.stderr,
       tostr    = config.tostr or log.tostr,
     }
     attach_log_methods(instance)

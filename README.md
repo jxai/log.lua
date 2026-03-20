@@ -54,6 +54,12 @@ ANSI colors and always use the full date rather than just the time. By default
 set as the `log.outfile` then it is created on the first message logged. If the
 file already exists it is appended to.
 
+#### log.stderr
+
+Whether to write console output to `stderr` instead of `stdout`. `false` by
+default. Useful when the calling program uses stdout for data output and expects
+log messages on stderr.
+
 #### log.tostr
 
 A custom function that takes a single value and returns its string
@@ -88,7 +94,7 @@ logger.warn("something went wrong")
 A string label included in each log line to identify the logger. `nil` by
 default (no label), as with the global logger.
 
-#### level, usecolor, outfile, tostr
+#### level, usecolor, outfile, stderr, tostr
 
 Same semantics as the global options above. They are mutable after creation:
 
@@ -96,6 +102,7 @@ Same semantics as the global options above. They are mutable after creation:
 logger.level = "trace"
 logger.usecolor = false
 logger.outfile = "app.log"
+logger.stderr = true
 logger.tostr = function(v)
   if type(v) == "table" then
     -- your own serialization

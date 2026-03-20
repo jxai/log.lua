@@ -25,15 +25,19 @@ local function assert_false(label, v)
   assert_eq(label, not not v, false)
 end
 
--- Capture print output for inspection
+-- Capture console output for inspection
 local captured = {}
-local real_print = print
+local real_stdout = io.stdout
+local real_stderr = io.stderr
+local mock_io = { write = function(_, s) captured[#captured + 1] = s end }
 local function capture_start()
   captured = {}
-  print = function(s) captured[#captured + 1] = s end
+  io.stdout = mock_io
+  io.stderr = mock_io
 end
 local function capture_stop()
-  print = real_print
+  io.stdout = real_stdout
+  io.stderr = real_stderr
 end
 
 
@@ -43,6 +47,7 @@ local function reset_log()
   log.level    = "trace"
   log.usecolor = true
   log.outfile  = nil
+  log.stderr   = false
   log.tostr    = nil
 end
 
@@ -54,7 +59,7 @@ end
 
 -- ── Suite: level filtering ────────────────────────────────────────────────────
 
-real_print("\n── level filtering ──")
+print("\n── level filtering ──")
 
 do
   reset_log()
@@ -101,7 +106,7 @@ end
 
 -- ── Suite: output format ──────────────────────────────────────────────────────
 
-real_print("\n── output format ──")
+print("\n── output format ──")
 
 do
   reset_log()
@@ -156,7 +161,7 @@ end
 
 -- ── Suite: number rounding ────────────────────────────────────────────────────
 
-real_print("\n── number rounding ──")
+print("\n── number rounding ──")
 
 do
   reset_log()
@@ -182,7 +187,7 @@ end
 
 -- ── Suite: multi-argument concatenation ──────────────────────────────────────
 
-real_print("\n── multi-argument concatenation ──")
+print("\n── multi-argument concatenation ──")
 
 do
   reset_log()
@@ -202,7 +207,7 @@ end
 
 -- ── Suite: outfile ────────────────────────────────────────────────────────────
 
-real_print("\n── outfile ──")
+print("\n── outfile ──")
 
 do
   local tmpfile = os.tmpname()
@@ -236,7 +241,7 @@ end
 
 -- ── Suite: invalid level ─────────────────────────────────────────────────────
 
-real_print("\n── invalid level ──")
+print("\n── invalid level ──")
 
 do
   -- setting an invalid level on the global logger raises immediately
@@ -265,7 +270,7 @@ end
 
 -- ── Suite: logger instances ───────────────────────────────────────────────────
 
-real_print("\n── logger instances ──")
+print("\n── logger instances ──")
 
 do
   -- log is callable and returns a table with all 6 log methods
@@ -354,7 +359,7 @@ end
 
 -- ── Suite: instance name ──────────────────────────────────────────────────────
 
-real_print("\n── instance name ──")
+print("\n── instance name ──")
 
 do
   -- name appears in console output
@@ -409,7 +414,7 @@ end
 
 -- ── Suite: noop optimization ─────────────────────────────────────────────────
 
-real_print("\n── noop optimization ──")
+print("\n── noop optimization ──")
 
 do
   -- all disabled levels share the same noop function reference
@@ -457,7 +462,7 @@ end
 
 -- ── Suite: tostr ─────────────────────────────────────────────────────────────
 
-real_print("\n── tostr ──")
+print("\n── tostr ──")
 
 do
   -- nil by default: existing behavior unchanged
@@ -476,7 +481,9 @@ do
   reset_log()
   log.usecolor = false
   local calls = {}
-  log.tostr = function(v) calls[#calls + 1] = v; return "x" end
+  log.tostr = function(v)
+    calls[#calls + 1] = v; return "x"
+  end
 
   capture_start()
   log.info("a", "b")
@@ -542,7 +549,77 @@ do
 end
 
 
+-- ── Suite: stderr ────────────────────────────────────────────────────────────
+
+print("\n── stderr ──")
+
+do
+  -- stderr=false by default: output goes to stdout
+  reset_log()
+  log.usecolor = false
+  assert_eq("stderr is false by default", log.stderr, false)
+end
+
+do
+  -- stderr=false: output goes to stdout, nothing to stderr
+  reset_log()
+  log.usecolor = false
+
+  local stdout_captured = {}
+  local stderr_captured = {}
+  io.stdout = { write = function(_, s) stdout_captured[#stdout_captured + 1] = s end }
+  io.stderr = { write = function(_, s) stderr_captured[#stderr_captured + 1] = s end }
+
+  log.info("to stdout")
+
+  io.stdout = real_stdout
+  io.stderr = real_stderr
+
+  assert_eq("stderr=false: stdout receives output", #stdout_captured, 1)
+  assert_true("stderr=false: stdout contains message", stdout_captured[1]:find("to stdout"))
+  assert_eq("stderr=false: stderr receives nothing", #stderr_captured, 0)
+end
+
+do
+  -- stderr=true: output goes to stderr, nothing to stdout
+  reset_log()
+  log.usecolor = false
+  log.stderr = true
+
+  local stdout_captured = {}
+  local stderr_captured = {}
+  io.stdout = { write = function(_, s) stdout_captured[#stdout_captured + 1] = s end }
+  io.stderr = { write = function(_, s) stderr_captured[#stderr_captured + 1] = s end }
+
+  log.info("to stderr")
+
+  io.stdout = real_stdout
+  io.stderr = real_stderr
+
+  assert_eq("stderr=true: stderr receives output", #stderr_captured, 1)
+  assert_true("stderr=true: stderr contains message", stderr_captured[1]:find("to stderr"))
+  assert_eq("stderr=true: stdout receives nothing", #stdout_captured, 0)
+end
+
+do
+  -- instance inherits stderr from global logger
+  reset_log()
+  log.stderr = true
+  local inst = log { usecolor = false }
+  assert_eq("instance inherits stderr from global logger", inst.stderr, true)
+  reset_log()
+end
+
+do
+  -- instance stderr overrides global
+  reset_log()
+  log.stderr = false
+  local inst = log { stderr = true, usecolor = false }
+  assert_eq("instance stderr overrides global", inst.stderr, true)
+end
+
+
 -- ── Summary ──────────────────────────────────────────────────────────────────
 
-real_print(string.format("\n%d passed, %d failed", passed, failed))
+print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then os.exit(1) end
